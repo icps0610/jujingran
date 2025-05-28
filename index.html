@@ -67,116 +67,129 @@
   </div>
 
   <script>
-    const userStats = {};
-    const removedUsers = new Set();
+  const userStats = {};
+  const removedUsers = new Set();
+  const userOrder = [];
 
-    document.getElementById('analyzeBtn').onclick = () => {
-      const files = document.getElementById('fileInput').files;
-      if (files.length === 0) return;
+  document.getElementById('analyzeBtn').onclick = () => {
+    const files = document.getElementById('fileInput').files;
+    if (files.length === 0) return;
 
-      Object.keys(userStats).forEach(k => delete userStats[k]);
-      removedUsers.clear();
+    Object.keys(userStats).forEach(k => delete userStats[k]);
+    removedUsers.clear();
+    userOrder.length = 0;
 
-      const fileReaders = [];
-      let completed = 0;
+    const fileReaders = [];
+    let completed = 0;
 
-      for (const file of files) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          parseText(reader.result);
-          completed++;
-          if (completed === files.length) {
-            renderUsers();
-            renderSummary();
-          }
-        };
-        reader.readAsText(file);
-        fileReaders.push(reader);
-      }
-    };
-
-    function parseText(text) {
-      const lines = text.split('\n');
-      const speakerRegex = /^\d{1,2}:\d{2} ([^\s]+) [^\s]+/;
-      let currentSpeaker = '';
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const match = speakerRegex.exec(line);
-        if (match) {
-          currentSpeaker = match[1];
-          if (!userStats[currentSpeaker]) {
-            userStats[currentSpeaker] = { JingRan: 0, JuRan: 0, Lines: 0 };
-          }
-          userStats[currentSpeaker].Lines++;
-        } else if (currentSpeaker) {
-          userStats[currentSpeaker].Lines++;
-        }
-
-        if (currentSpeaker) {
-          userStats[currentSpeaker].JingRan += (line.match(/竟然/g) || []).length;
-          userStats[currentSpeaker].JuRan += (line.match(/居然/g) || []).length;
-        }
-      }
-    }
-
-    function renderUsers() {
-      const container = document.getElementById('userList');
-      container.innerHTML = '';
-      const speakers = Object.keys(userStats).sort();
-
-      for (const speaker of speakers) {
-        const tag = document.createElement('div');
-        tag.className = 'user-tag badge bg-secondary text-white user-badge';
-        tag.innerHTML = `${speaker}（竟然 ${userStats[speaker].JingRan}，居然 ${userStats[speaker].JuRan}）`;
-
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-sm text-danger fw-bold border-0 bg-transparent ms-2';
-        btn.textContent = 'X';
-        btn.onclick = () => {
-          removedUsers.add(speaker);
-          tag.remove();
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        parseText(reader.result);
+        completed++;
+        if (completed === files.length) {
+          renderUsers();
           renderSummary();
-        };
-
-        tag.appendChild(btn);
-        container.appendChild(tag);
-      }
-    }
-
-    function renderSummary() {
-      const summaryDiv = document.getElementById('summary');
-      summaryDiv.innerHTML = '';
-
-      let listJingRanUsers = [];
-      let listJuRanUsers = [];
-
-      for (const speaker in userStats) {
-        if (removedUsers.has(speaker)) continue;
-        const stats = userStats[speaker];
-        if (stats.JingRan > stats.JuRan) {
-          listJingRanUsers.push(speaker);
-        } else if (stats.JuRan > stats.JingRan) {
-          listJuRanUsers.push(speaker);
         }
+      };
+      reader.readAsText(file);
+      fileReaders.push(reader);
+    }
+  };
+
+  function parseText(text) {
+    const lines = text.split('\n');
+    const speakerRegex = /^\d{1,2}:\d{2} ([^\s]+) [^\s]+/;
+    let currentSpeaker = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const match = speakerRegex.exec(line);
+      if (match) {
+        currentSpeaker = match[1];
+        if (!userStats[currentSpeaker]) {
+          userStats[currentSpeaker] = { JingRan: 0, JuRan: 0, Lines: 0 };
+          userOrder.push(currentSpeaker);
+        }
+        userStats[currentSpeaker].Lines++;
+      } else if (currentSpeaker) {
+        userStats[currentSpeaker].Lines++;
       }
 
-      listJingRanUsers.sort();
-      listJuRanUsers.sort();
-
-      summaryDiv.innerHTML = `
-        <p><strong>主要使用「竟然」的使用者：${listJingRanUsers.length} 人</strong></p>
-        <div class="summary-group mb-3">
-          ${listJingRanUsers.map(name => `<span class="badge bg-primary">${name}</span>`).join('')}
-        </div>
-        <p><strong>主要使用「居然」的使用者：${listJuRanUsers.length} 人</strong></p>
-        <div class="summary-group">
-          ${listJuRanUsers.map(name => `<span class="badge bg-success">${name}</span>`).join('')}
-        </div>
-      `;
+      if (currentSpeaker) {
+        userStats[currentSpeaker].JingRan += (line.match(/竟然/g) || []).length;
+        userStats[currentSpeaker].JuRan += (line.match(/居然/g) || []).length;
+      }
     }
-  </script>
+  }
+
+  function renderUsers() {
+    const container = document.getElementById('userList');
+    container.innerHTML = '';
+    const speakers = Object.keys(userStats).sort();
+
+    for (const speaker of speakers) {
+      if (removedUsers.has(speaker)) continue;
+
+      const tag = document.createElement('div');
+      tag.className = 'user-tag badge bg-secondary text-white user-badge';
+      tag.innerHTML = `${speaker}（竟然 ${userStats[speaker].JingRan}，居然 ${userStats[speaker].JuRan}）`;
+
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm text-danger fw-bold border-0 bg-transparent ms-2';
+      btn.textContent = 'X';
+      btn.onclick = () => {
+        const index = userOrder.indexOf(speaker);
+        if (index > 0) {
+          const prev = userOrder[index - 1];
+          userStats[prev].JingRan += userStats[speaker].JingRan;
+          userStats[prev].JuRan += userStats[speaker].JuRan;
+        }
+        removedUsers.add(speaker);
+        tag.remove();
+        renderUsers();
+        renderSummary();
+      };
+
+      tag.appendChild(btn);
+      container.appendChild(tag);
+    }
+  }
+
+  function renderSummary() {
+    const summaryDiv = document.getElementById('summary');
+    summaryDiv.innerHTML = '';
+
+    let listJingRanUsers = [];
+    let listJuRanUsers = [];
+
+    for (const speaker in userStats) {
+      if (removedUsers.has(speaker)) continue;
+      const stats = userStats[speaker];
+      if (stats.JingRan > stats.JuRan) {
+        listJingRanUsers.push(speaker);
+      } else if (stats.JuRan > stats.JingRan) {
+        listJuRanUsers.push(speaker);
+      }
+    }
+
+    listJingRanUsers.sort();
+    listJuRanUsers.sort();
+
+    summaryDiv.innerHTML = `
+      <p><strong>主要使用「竟然」的使用者：${listJingRanUsers.length} 人</strong></p>
+      <div class="summary-group mb-3">
+        ${listJingRanUsers.map(name => `<span class="badge bg-primary">${name}</span>`).join('')}
+      </div>
+      <p><strong>主要使用「居然」的使用者：${listJuRanUsers.length} 人</strong></p>
+      <div class="summary-group">
+        ${listJuRanUsers.map(name => `<span class="badge bg-success">${name}</span>`).join('')}
+      </div>
+    `;
+  }
+</script>
+
 </body>
 </html>
