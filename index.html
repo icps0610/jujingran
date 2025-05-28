@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>竟然 vs 居然 分析</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .user-tag {
+      display: inline-block;
+      margin: 4px;
+    }
+
+    .user-badge {
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .btn-close-red {
+      margin-left: 8px;
+      filter: invert(1) grayscale(100%) sepia(100%) hue-rotate(310deg) saturate(500%);
+    }
+
+    .summary-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .btn-close-red::before {
+      content: '✖';
+      color: rgb(230, 53, 53);
+      font-size: 1rem;
+      display: inline-block;
+    }
+    .btn-close-red {
+      background: none;
+      border: none;
+      padding: 0 0 0 8px;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-light py-4">
+  <div class="container">
+    <h2 class="mb-4 text-center">竟然 vs 居然 使用統計分析</h2>
+
+    <div class="mb-3">
+      <label for="fileInput" class="form-label">選擇文字檔案（可多選）</label>
+      <input class="form-control" type="file" id="fileInput" multiple accept=".txt">
+    </div>
+
+    <div class="d-grid mb-4">
+      <button class="btn btn-primary" id="analyzeBtn">分析</button>
+    </div>
+
+    <div>
+      <h5>使用者列表</h5>
+      <div id="userList" class="mb-4"></div>
+    </div>
+
+    <div>
+      <h5>統計結果</h5>
+      <div id="summary" class="card p-3 bg-white shadow-sm"></div>
+    </div>
+  </div>
+
+  <script>
+    const userStats = {};
+    const removedUsers = new Set();
+
+    document.getElementById('analyzeBtn').onclick = () => {
+      const files = document.getElementById('fileInput').files;
+      if (files.length === 0) return;
+
+      Object.keys(userStats).forEach(k => delete userStats[k]);
+      removedUsers.clear();
+
+      const fileReaders = [];
+      let completed = 0;
+
+      for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          parseText(reader.result);
+          completed++;
+          if (completed === files.length) {
+            renderUsers();
+            renderSummary();
+          }
+        };
+        reader.readAsText(file);
+        fileReaders.push(reader);
+      }
+    };
+
+    function parseText(text) {
+      const lines = text.split('\n');
+      const speakerRegex = /^\d{1,2}:\d{2} ([^\s]+) [^\s]+/;
+      let currentSpeaker = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const match = speakerRegex.exec(line);
+        if (match) {
+          currentSpeaker = match[1];
+          if (!userStats[currentSpeaker]) {
+            userStats[currentSpeaker] = { JingRan: 0, JuRan: 0, Lines: 0 };
+          }
+          userStats[currentSpeaker].Lines++;
+        } else if (currentSpeaker) {
+          userStats[currentSpeaker].Lines++;
+        }
+
+        if (currentSpeaker) {
+          userStats[currentSpeaker].JingRan += (line.match(/竟然/g) || []).length;
+          userStats[currentSpeaker].JuRan += (line.match(/居然/g) || []).length;
+        }
+      }
+    }
+
+    function renderUsers() {
+      const container = document.getElementById('userList');
+      container.innerHTML = '';
+      const speakers = Object.keys(userStats).sort();
+
+      for (const speaker of speakers) {
+        const tag = document.createElement('div');
+        tag.className = 'user-tag badge bg-secondary text-white user-badge';
+        tag.innerHTML = `${speaker}（竟然 ${userStats[speaker].JingRan}，居然 ${userStats[speaker].JuRan}）`;
+
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-sm text-danger fw-bold border-0 bg-transparent ms-2';
+        btn.textContent = 'X';
+        btn.onclick = () => {
+          removedUsers.add(speaker);
+          tag.remove();
+          renderSummary();
+        };
+
+        tag.appendChild(btn);
+        container.appendChild(tag);
+      }
+    }
+
+    function renderSummary() {
+      const summaryDiv = document.getElementById('summary');
+      summaryDiv.innerHTML = '';
+
+      let listJingRanUsers = [];
+      let listJuRanUsers = [];
+
+      for (const speaker in userStats) {
+        if (removedUsers.has(speaker)) continue;
+        const stats = userStats[speaker];
+        if (stats.JingRan > stats.JuRan) {
+          listJingRanUsers.push(speaker);
+        } else if (stats.JuRan > stats.JingRan) {
+          listJuRanUsers.push(speaker);
+        }
+      }
+
+      listJingRanUsers.sort();
+      listJuRanUsers.sort();
+
+      summaryDiv.innerHTML = `
+        <p><strong>主要使用「竟然」的使用者：${listJingRanUsers.length} 人</strong></p>
+        <div class="summary-group mb-3">
+          ${listJingRanUsers.map(name => `<span class="badge bg-primary">${name}</span>`).join('')}
+        </div>
+        <p><strong>主要使用「居然」的使用者：${listJuRanUsers.length} 人</strong></p>
+        <div class="summary-group">
+          ${listJuRanUsers.map(name => `<span class="badge bg-success">${name}</span>`).join('')}
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
